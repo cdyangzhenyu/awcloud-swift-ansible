@@ -1,0 +1,47 @@
+Listen {{horizon_https_port}}
+
+<VirtualHost *:{{horizon_port}}>
+#ServerName
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteCond %{HTTPS} off
+        RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI}
+    </IfModule>
+    <IfModule !mod_rewrite.c>
+    #RedirectPermanent / https://openstack.example.com
+    </IfModule>
+</VirtualHost>
+
+<VirtualHost *:{{horizon_https_port}}>
+#ServerName openstack.example.com
+
+    SSLEngine On
+    SSLVerifyDepth 1
+    # Remember to replace certificates and keys with valid paths in your environment
+    SSLCertificateFile /etc/ssl/certs/swift.crt
+    SSLCACertificateFile /etc/ssl/certs/swift.crt
+    SSLCertificateKeyFile /etc/ssl/certs/swift.key
+
+    SetEnvIf User-Agent ".*MSIE.*" nokeepalive ssl-unclean-shutdown
+    
+    # HTTP Strict Transport Security (HSTS) enforces that all communications
+    # with a server go over SSL. This mitigates the threat from attacks such
+    # as SSL-Strip which replaces links on the wire, stripping away https prefixes
+    # and potentially allowing an attacker to view confidential information on the
+    # wire
+    Header add Strict-Transport-Security "max-age=15768000"
+    WSGIApplicationGroup %{GLOBAL}
+    WSGIScriptAlias / /usr/share/openstack-dashboard/openstack_dashboard/wsgi/django.wsgi
+    WSGIDaemonProcess horizon user=apache group=apache processes=5 threads=10
+    Alias /static /usr/share/openstack-dashboard/static/
+    <Directory /usr/share/openstack-dashboard/openstack_dashboard/wsgi>
+        Options All
+        AllowOverride All
+        Require all granted
+    </Directory>
+    <Directory /usr/share/openstack-dashboard/static>
+        Options All
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>

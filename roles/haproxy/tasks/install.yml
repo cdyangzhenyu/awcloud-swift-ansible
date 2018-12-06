@@ -1,0 +1,122 @@
+---
+- name: Include distribution variables
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution }}.yml"
+    - "{{ ansible_os_family }}.yml"
+    - default.yml
+
+- name: 'Check epel repo'
+  shell: yum repolist | grep -qi EPEL
+  register: epel_repo_check
+  check_mode: false
+  when: ansible_pkg_mgr == "yum"
+
+- name: 'Add epel repo'
+  template:
+    src: "epel.repo"
+    dest: "/etc/yum.repos.d/epel.repo"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: ansible_pkg_mgr == "yum" and epel_repo_check is defined and epel_repo_check.rc != 0
+
+- name: 'Add haproxy apt repo (squeeze)'
+  apt_repository:
+    repo: deb http://http.debian.net/debian {{ ansible_distribution_release }}-backports-sloppy main
+    state: present
+    update_cache: yes
+  when: ansible_distribution_release == 'squeeze'
+
+- name: Add haproxy apt repo (wheezy/jessie)
+  apt_repository:
+    repo: deb http://http.debian.net/debian {{ ansible_distribution_release }}-backports main
+    state: present
+    update_cache: yes
+  when: ansible_distribution_release == 'wheezy' or ansible_distribution_release == 'jessie'
+
+- name: 'Add haproxy apt repo (Ubuntu)'
+  apt_repository:
+    repo: "ppa:vbernat/haproxy-1.5"
+    state: present
+    update_cache: yes
+  when: ansible_distribution == "Ubuntu"
+
+- name: Install HAProxy (yum)
+  yum:
+    name: "{{ haproxy_package_name }}"
+  when: ansible_pkg_mgr == "yum"
+
+- name: Install HAProxy (apt squeeze)
+  apt:
+    name: "{{ haproxy_package_name }}"
+    default_release: "{{ansible_distribution_release}}-backports-sloppy"
+  when: ansible_distribution_release == 'squeeze'
+
+- name: Install HAProxy (apt wheezy/jessie)
+  apt:
+    name: "{{ haproxy_package_name }}"
+    default_release: "{{ansible_distribution_release}}-backports"
+  when: ansible_distribution_release == 'wheezy' or ansible_distribution_release == 'jessie'
+
+- name: Install HAProxy (Ubuntu)
+  package:
+    name: "{{ haproxy_package_name }}"
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Install supplementary packages
+  package:
+    name: "{{ item }}"
+  with_items: "{{ haproxy_extra_packages }}"
+
+- name: 'Enable it'
+  service:
+    name: haproxy
+    enabled: no
+
+- name: 'Ensure chroot directory exists'
+  file:
+    name: "{{ haproxy_global.chroot }}"
+    state: directory
+  when: haproxy_global.chroot is defined and haproxy_global.chroot
+
+- name: Render swift-ca
+  run_once: true
+  template:
+    src: create-swift-ca.sh.jinja2
+    dest: /tmp/create-swift-ca.sh
+  when: swift_http_scheme == "https"
+
+- name: Create swift-ca
+  run_once: true
+  ignore_errors: yes
+  shell: bash /tmp/create-swift-ca.sh
+  when: swift_http_scheme == "https"
+  
+- name: Copy swift ca to ssl dir
+  copy:
+    src: "~/{{item}}"
+    dest: "/etc/ssl/certs"
+  with_items:
+    ["swift.crt", "swift.key"]
+  when: swift_http_scheme == "https"
+
+- name: Create swift pem to ssl dir
+  shell: cat /etc/ssl/certs/swift.crt /etc/ssl/certs/swift.key | tee /etc/ssl/certs/swift.pem
+  when: swift_http_scheme == "https"
+  
+- name: Fix haproxy log ownership
+  file:
+    group: 'root'
+    owner: 'adm'
+    path: '/var/log/haproxy/'
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+
+- name: Set up rsyslog for haproxy
+  copy: src={{item}} dest=/etc/rsyslog.d/{{item}} owner=root mode=0644
+  with_items:
+    - 20_haproxy.conf
+    - listen.conf
+  notify:
+    - restart rsyslog server  

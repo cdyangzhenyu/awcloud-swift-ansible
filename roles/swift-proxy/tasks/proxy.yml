@@ -1,0 +1,59 @@
+- name: Install Swift controll
+  yum:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+  - openstack-swift-proxy
+  - python-swiftclient
+  - python-memcached
+  - openssh-clients
+  tags:
+  - proxy
+
+- name: Render swift-account.sh
+  run_once: true
+  template:
+    src: swift-account.sh.jinja2
+    dest: /tmp/swift-account.sh
+  tags:
+  - proxy
+
+- name: Run swift-account.sh
+  run_once: true
+  ignore_errors: yes
+  shell: bash /tmp/swift-account.sh
+  tags:
+  - proxy
+
+- name: Fix swift log ownership
+  file:
+    group: 'root'
+    owner: 'adm'
+    path: '/var/log/swift/'
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+
+# Configure Swift-Proxy
+
+- name: Swift proxy server configuration
+  template: src=proxy-server.conf.j2 dest=/etc/swift/proxy-server.conf owner=swift mode=0644
+  tags:
+  - proxy
+
+- name: Swift conf
+  template: src=swift.conf.j2 dest=/etc/swift/swift.conf owner=swift mode=0644
+
+- name: Set proxy server to start at boot
+  cron: special_time=reboot job="swift-init proxy-server start" name="start wift proxy"
+  tags:
+  - proxy
+
+- name: Set up rsyslog for proxy
+  copy: src=10_swift_proxy.conf dest=/etc/rsyslog.d/10_swift_proxy.conf owner=root mode=0644
+  tags:
+  - proxy
+  notify:
+    - restart rsyslog server
+
+- name: Set permission
+  shell: chown -R swift:swift /etc/swift/

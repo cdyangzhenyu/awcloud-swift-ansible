@@ -1,0 +1,5 @@
+- name: "Create swift group"
+  group: name=swift state=present system=yes
+
+- name: "Create a swift user"
+  user: name=swift state=present shell=/bin/false home=/opt/swift system=yes

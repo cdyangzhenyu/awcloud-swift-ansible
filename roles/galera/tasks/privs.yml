@@ -1,0 +1,29 @@
+---
+- name: judge is bootstrap
+  run_once: true
+  shell: ls bootstrap
+  ignore_errors: True
+  register: result
+
+- name: Ensure MariaDB is running
+  service:
+    name: mariadb
+    state: started
+  when: result|failed
+
+- name: Add Galera SST user
+  ignore_errors: true
+  mysql_user:
+    name: "{{ galera_sst_user }}"
+    host: "localhost"
+    password: "{{ galera_sst_pass }}"
+    priv: "*.*:RELOAD,PROCESS,LOCK TABLES,REPLICATION CLIENT"
+    append_privs: yes
+
+- name: Add Galera haproxy user
+  ignore_errors: true
+  mysql_user:
+    name: "haproxy"
+    host: "%"
+    priv: "*.*:ALL"
+    append_privs: yes

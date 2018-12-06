@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+openstack user create --domain default --password {{ openstack_keystone_swift_password }} swift
+openstack role add --project service --user swift admin
+
+openstack service create --name swift --description "OpenStack Object Storage" object-store
+
+openstack endpoint create --region RegionOne object-store public {{ http_scheme }}://{{public_ip}}:{{ha_swift_port}}/v1/AUTH_%\(project_id\)s
+openstack endpoint create --region RegionOne object-store internal {{ http_scheme }}://{{external_vip}}:{{ha_swift_port}}/v1/AUTH_%\(project_id\)s
+openstack endpoint create --region RegionOne object-store admin {{ http_scheme }}://{{admin_vip}}:{{ha_swift_port}}/v1

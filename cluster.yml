@@ -1,0 +1,444 @@
+---
+- hosts: all
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+  roles:
+    - { role: bootstrap-os, tags: bootstrap-os}
+    - { role: common}
+    - { role: ntp}
+
+# setup and init galera
+- hosts: galera_cluster
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: true
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+  roles:
+    - { role: galera}
+
+# setup and init haproxy
+- hosts: controller
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  roles:
+    - { role: haproxy}
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+    haproxy_frontends:
+    - name: mysql_admin
+      ip: "{{ admin_vip }}"
+      port: "{{ ha_mysql_port }}"
+      mode: tcp
+      default_backend: mysql_admin_backend
+    - name: keystone_admin
+      ip: "{{ admin_vip }}"
+      port: "{{ ha_admin_keystone_port }}"
+      mode: http
+      default_backend: keystone_admin_backend
+    - name: keystone_external
+      ip: "{{ external_vip }}"
+      port: "{{ ha_keystone_port }}"
+      mode: http
+      default_backend: keystone_external_backend
+    - name: swift_admin
+      ip: "{{ admin_vip }}"
+      port: "{{ ha_swift_port }}"
+      mode: http
+      options:
+        - forwardfor
+      default_backend: swift_admin_backend
+    - name: swift_external
+      ip: "{{ external_vip }}"
+      port: "{{ ha_swift_port }}"
+      mode: http
+      options:
+        - forwardfor
+      default_backend: swift_external_backend
+    - name: swift_external_https
+      ip: "{{ external_vip }}"
+      port: "{{ swift_https_port }}"
+      mode: http
+      options:
+        - forwardfor
+      bind:
+      - "{{ external_vip }}:{{ swift_https_port }}"
+      ssl:
+        cert: /etc/ssl/certs/swift.pem no-sslv3
+      default_backend: swift_external_backend_ssl
+    - name: swift_admin_https
+      ip: "{{ admin_vip }}"
+      port: "{{ swift_https_port }}"
+      mode: http
+      options:
+        - forwardfor
+      bind:
+      - "{{ admin_vip }}:{{ swift_https_port }}"
+      ssl:
+        cert: /etc/ssl/certs/swift.pem no-sslv3
+      default_backend: swift_admin_backend_ssl
+    - name: horizon_external_https
+      ip: "{{ external_vip }}"
+      port: "{{ ha_horizon_https_port }}"
+      mode: tcp
+      bind:
+      - "{{ external_vip }}:{{ ha_horizon_https_port }}"
+      default_backend: horizon_external_backend_ssl
+    - name: horizon_admin_https
+      ip: "{{ admin_vip }}"
+      port: "{{ ha_horizon_https_port }}"
+      mode: tcp
+      bind:
+      - "{{ admin_vip }}:{{ ha_horizon_https_port }}"
+      default_backend: horizon_admin_backend_ssl
+    haproxy_backends:
+    - name: mysql_admin_backend
+      balance: leastconn
+      mode: tcp
+      options:
+        - mysql-check user haproxy
+        - tcpka
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].admin_ip }}"
+          port: "{{ mysql_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].admin_ip }}"
+          port: "{{ mysql_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].admin_ip }}"
+          port: "{{ mysql_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: keystone_admin_backend
+      balance: source
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].admin_ip }}"
+          port: "{{ admin_keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].admin_ip }}"
+          port: "{{ admin_keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].admin_ip }}"
+          port: "{{ admin_keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: keystone_external_backend
+      balance: source
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].internal_ip }}"
+          port: "{{ keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].internal_ip }}"
+          port: "{{ keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].internal_ip }}"
+          port: "{{ keystone_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: swift_admin_backend
+      mode: http
+      balance: source
+      options:
+        - "httpchk HEAD /healthcheck HTTP/1.0"
+        - forwardfor
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: swift_admin_backend_ssl
+      mode: http
+      balance: source
+      options:
+        - "httpchk HEAD /healthcheck HTTP/1.0"
+        - forwardfor
+      http_request:
+        - action: set-header
+          param: X-Forwarded-Port
+          condition: "%[dst_port]"
+        - action: add-header
+          param: X-Forwarded-Proto
+          condition: "https if { ssl_fc }"
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].admin_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: swift_external_backend
+      mode: http
+      balance: source
+      options:
+        - "httpchk HEAD /healthcheck HTTP/1.0"
+        - forwardfor
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: swift_external_backend_ssl
+      mode: http
+      balance: source
+      options:
+        - "httpchk HEAD /healthcheck HTTP/1.0"
+        - forwardfor
+      http_request:
+        - action: set-header
+          param: X-Forwarded-Port
+          condition: "%[dst_port]"
+        - action: add-header
+          param: X-Forwarded-Proto
+          condition: "https if { ssl_fc }"
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].internal_ip }}"
+          port: "{{ swift_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: horizon_admin_backend_ssl
+      mode: tcp
+      balance: source
+      options:
+        - tcpka
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].admin_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].admin_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].admin_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+    - name: horizon_external_backend_ssl
+      mode: tcp
+      balance: source
+      options:
+        - tcpka
+      servers:
+        - name: "{{ haproxy.controller[0].name }}"
+          ip: "{{ haproxy.controller[0].internal_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[1].name }}"
+          ip: "{{ haproxy.controller[1].internal_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+        - name: "{{ haproxy.controller[2].name }}"
+          ip: "{{ haproxy.controller[2].internal_ip }}"
+          port: "{{ horizon_https_port }}"
+          params:
+            - "weight 5 check inter 5s"
+
+# setup and init pacemaker
+- hosts: controller
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  roles:
+    - { role: pacemaker}
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+    pacemaker_cluster_options:
+      stonith-enabled: false
+      no-quorum-policy: ignore
+    pacemaker_simple_resources:
+      external_vip:
+        resource:
+          class: ocf
+          provider: heartbeat
+          type: IPaddr2
+        options:
+          ip: "{{ external_vip }}"
+          cidr_netmask: 24
+        op:
+          - name: monitor
+            interval: 5s
+
+- hosts: controller
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  roles:
+    - { role: pacemaker}
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+    pacemaker_cluster_options:
+      stonith-enabled: false
+      no-quorum-policy: ignore
+    pacemaker_simple_resources:
+      admin_vip:
+        resource:
+          class: ocf
+          provider: heartbeat
+          type: IPaddr2
+        options:
+          ip: "{{ admin_vip }}"
+          cidr_netmask: 24
+        op:
+          - name: monitor
+            interval: 5s
+    pacemaker_constraints:
+      - type: colocation
+        rsc: external_vip
+        with-rsc: admin_vip
+        score: INFINITY
+
+- hosts: controller
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  roles:
+    - { role: pacemaker}
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+    pacemaker_cluster_options:
+      stonith-enabled: false
+      no-quorum-policy: ignore
+    pacemaker_simple_resources:
+      haproxy:
+        resource:
+          class: systemd
+          type: haproxy
+        op:
+          - name: monitor
+            interval: 5s
+    pacemaker_constraints:
+      - type: colocation
+        rsc: admin_vip
+        with-rsc: haproxy
+        score: INFINITY
+      - type: order
+        first: external_vip
+        then: haproxy
+        score: INFINITY
+
+- hosts: controller
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  gather_facts: false
+  roles:
+    - { role: pacemaker}
+  vars:
+    # Need to disable pipelining for bootstrap-os as some systems have requiretty in sudoers set, which makes pipelining
+    # fail. bootstrap-os fixes this on these systems, so in later plays it can be enabled.
+    ansible_ssh_pipelining: false
+    pacemaker_cluster_options:
+      stonith-enabled: false
+      no-quorum-policy: ignore
+    pacemaker_advanced_resources:
+      p_galera:
+        type: master
+        meta:
+          master-max: 3
+        resources:
+          p_galera_master:
+            resource:
+              class: ocf
+              provider: heartbeat
+              type: galera
+            options:
+              wsrep_cluster_address: "gcomm://{{ haproxy.controller[0].admin_ip }},{{ haproxy.controller[1].admin_ip }},{{ haproxy.controller[2].admin_ip }}"
+              cluster_host_map: "{{ haproxy.controller[0].name }}:{{ haproxy.controller[0].admin_ip }};{{ haproxy.controller[1].name }}:{{ haproxy.controller[1].admin_ip }};{{ haproxy.controller[2].name }}:{{ haproxy.controller[2].admin_ip }}"
+
+
+# setup and init keystone
+- hosts: controller
+  roles:
+    - role: keystone
+      openstack_keystone_database_url: "mysql+pymysql://{{ MYSQL_KEYSTONE_USER }}:{{ MYSQL_KEYSTONE_PASS }}@{{ ansible_host }}:{{ mysql_port }}/{{ MYSQL_KEYSTONE_DB }}"
+      openstack_keystone_admin_token: "{{ ADMIN_TOKEN }}"
+
+# setup and init horizon
+- hosts: controller
+  roles:
+    - { role: horizon }
+
+## setup and init proxy
+#- hosts: controller
+#  roles:
+#    - role: swift-proxy
+#
+## setup and init storage
+#- hosts: storage
+#  roles:
+#    - role: swift-storage
+
+# run swift bench
+#- hosts: controller
+#  roles:
+#    - role: swift-bench

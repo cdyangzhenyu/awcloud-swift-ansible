@@ -1,0 +1,8 @@
+---
+dependencies:
+  - role: adduser
+    user: "{{ addusers.system }}"
+    when: not (ansible_os_family in ['CoreOS', 'Container Linux by CoreOS'])
+  
+#  - role: firewall
+#    when: not (ansible_os_family in ['CoreOS', 'Container Linux by CoreOS'])

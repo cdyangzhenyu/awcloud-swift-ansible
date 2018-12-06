@@ -1,0 +1,9 @@
+- include: user.yml
+
+- include: proxy.yml
+  tags: proxy
+
+- include: ring.yml
+
+- include: enable_proxy.yml
+  tags: proxy

@@ -1,0 +1,40 @@
+[DEFAULT]
+bind_ip = 0.0.0.0
+bind_port = 6200
+user = swift
+swift_dir = /etc/swift
+devices = /srv/node
+mount_check = true
+
+log_name = swift-object
+log_facility = LOG_LOCAL1
+log_level = DEBUG
+log_headers = false
+log_address = /dev/log
+
+[pipeline:main]
+pipeline = healthcheck recon object-server
+
+[app:object-server]
+use = egg:swift#object
+#replication_server = true
+
+[filter:healthcheck]
+use = egg:swift#healthcheck
+
+[filter:recon]
+use = egg:swift#recon
+recon_cache_path = /var/cache/swift
+recon_lock_path = /var/lock
+
+[object-reconstructor]
+
+[object-updater]
+
+[object-auditor]
+
+[filter:xprofile]
+use = egg:swift#xprofile
+
+[object-replicator]
+#rsync_module = {replication_ip}::object{replication_port}

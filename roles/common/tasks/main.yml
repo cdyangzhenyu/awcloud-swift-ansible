@@ -1,0 +1,46 @@
+---
+- name: update /etc/hosts file
+#    become: true
+  tags: always
+  blockinfile:
+    dest: /etc/hosts
+    content: "{{ lookup('template', 'hosts.j2') }}"
+    state: present
+    
+- name: SSH KeyGen command
+  tags: always
+  shell: > 
+    ssh-keygen -q -b 2048 -t rsa -N "" -C "oss SSH" -f {{system_userhome}}/.ssh/id_rsa
+    creates="{{system_userhome}}/.ssh/id_rsa"
+
+- name: Fetch the keyfile from one server to another
+  tags: always
+  fetch: 
+    src: "{{ system_userhome }}/.ssh/id_rsa.pub"
+    dest: "buffer/{{ansible_hostname}}-id_rsa.pub"
+    flat: yes
+
+- name: Copy the key add to authorized_keys using Ansible module
+  tags: always
+  authorized_key:
+    user: "{{ system_username }}"
+    state: present
+    key: "{{ lookup('file','buffer/{{item}}-id_rsa.pub')}}"
+  with_items: 
+    - "{{groups['all']}}"
+
+
+- name: update /etc/sysctl.conf file
+#    become: true
+  tags: always
+  blockinfile:
+    dest: /etc/sysctl.conf
+    content: "{{ lookup('template', 'sysctl.conf.j2') }}"
+    state: present
+
+- name: run sysctl -p
+  sysctl:
+    name: net.ipv4.tcp_tw_recycle
+    value: 1
+    state: present
+    reload: yes

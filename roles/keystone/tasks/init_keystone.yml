@@ -1,0 +1,29 @@
+
+
+- name: Render keystone.sh
+  template:
+    src: keystone.sh.jinja2
+    dest: /etc/profile.d/keystone.sh
+  tags:
+  - keystone
+
+- name: Config bash completion
+  run_once: true
+  shell: openstack complete > /etc/bash_completion.d/openstack.sh
+  tags:
+  - keystone
+
+- name: Render init-project.sh
+  run_once: true
+  template:
+    src: init-project.sh.jinja2
+    dest: /tmp/init-project.sh
+  tags:
+  - keystone
+
+- name: Create user
+  run_once: true
+  ignore_errors: true
+  shell: bash /tmp/init-project.sh
+  tags:
+  - keystone

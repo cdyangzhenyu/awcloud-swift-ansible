@@ -1,0 +1,9 @@
+- include: user.yml
+
+- include: storage.yml
+  tags: storage
+
+- include: ring.yml
+
+- include: enable_storage.yml
+  tags: storage

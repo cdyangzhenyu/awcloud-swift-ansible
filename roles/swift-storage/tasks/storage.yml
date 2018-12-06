@@ -1,0 +1,147 @@
+- name: Install OpenStack Rocky release
+  yum:
+    name: centos-release-openstack-rocky
+    state: latest
+  tags:
+  - storage
+
+- name: Install Swift storage
+  yum:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+  - openstack-swift-account
+  - openstack-swift-container
+  - openstack-swift-object
+  - xfsprogs
+  - rsync
+  - openssh-clients
+  - tree
+  tags:
+  - storage
+
+  # Config Swift Disk
+
+- name: "Create partition on /dev/{{ swift_disk }}"
+  parted:
+    device: "/dev/{{ item }}"
+    number: 1
+    state: present
+  with_items: "{{swift_disk}}"
+  tags:
+  - storage
+
+- name: "Format disk /dev/{{ swift_disk }}"
+  filesystem:
+    fstype: "{{ disk_format}}"
+    dev: "/dev/{{ item }}1"
+  with_items: "{{swift_disk}}"
+  tags:
+  - storage
+
+- name: Create mount point
+  file:
+    path: "/srv/node/{{ item }}"
+    state: directory
+    owner: swift
+    group: swift
+  with_items: "{{swift_disk}}"
+  tags:
+  - storage
+
+- name: Mount Swift partition
+  mount:
+    path: "/srv/node/{{ item }}"
+    src: "/dev/{{ item }}1"
+    fstype: "{{ disk_format }}"
+    opts: "{{ mount_opts }}"
+    passno: 2
+    state: mounted
+  with_items: "{{swift_disk}}"
+  tags:
+  - storage
+
+- name: Fix swift log ownership
+  file:
+    group: 'root'
+    owner: 'adm'
+    path: '/var/log/swift/'
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+
+  # Config Swift
+
+- name: Swift conf
+  template: src=swift.conf.j2 dest=/etc/swift/swift.conf owner=swift mode=0644
+
+- name: Swift account server configuration
+  template: src=account-server.conf.j2 dest=/etc/swift/account-server.conf owner=swift mode=0644
+  tags:
+  - storage
+  
+- name: Swift container server configuration
+  template: src=container-server.conf.j2 dest=/etc/swift/container-server.conf owner=swift mode=0644
+  tags:
+  - storage
+
+- name: Swift object server configuration
+  template: src=object-server.conf.j2 dest=/etc/swift/object-server.conf owner=swift mode=0644
+  tags:
+  - storage
+
+- name: Render /etc/rsyncd.conf
+  template:
+    src: rsyncd.conf.jinja2
+    dest: /etc/rsyncd.conf
+  tags:
+  - storage
+
+- name: Enable rsyncd
+  systemd:
+    name: rsyncd
+    state: restarted
+    enabled: yes
+  tags:
+  - storage
+
+- name: Set dir conf permission
+  file:
+    group: 'swift'
+    owner: 'swift'
+    path: '/etc/swift/'
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - storage
+
+- name: Set dir conf permission
+  file:
+    group: 'swift'
+    owner: 'swift'
+    path: '/srv/node'
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - storage
+
+- name: Set recon dir conf permission
+  file:
+    group: 'swift'
+    owner: 'swift'
+    path: '/var/cache/swift'
+    mode: 0755
+    recurse: True
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - storage
+
+- name: Set up rsyslog for proxy
+  copy: src="{{item}}" dest="/etc/rsyslog.d/{{item}}" owner=root mode=0644
+  tags:
+  - proxy
+  with_items:
+    - 20_swift_object.conf
+    - 30_swift_account.conf
+    - 40_swift_container.conf
+  notify:
+    - restart rsyslog server

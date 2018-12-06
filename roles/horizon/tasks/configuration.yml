@@ -1,0 +1,88 @@
+---
+
+#
+# Copyright (c) 2014 Davide Guerri <davide.guerri@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+- name: Configure openstack-dashboard local_settings file
+  lineinfile:
+    dest: '{{ openstack_horizon_dashboard_settings }}'
+    regexp: '{{ item.regexp }}'
+    line: '{{ item.line }}'
+  with_items:
+    - {regexp: '^OPENSTACK_HOST =', line: "OPENSTACK_HOST = '{{ openstack_horizon_keystone_hostname }}'"}
+    - {regexp: '^ALLOWED_HOSTS =', line: "ALLOWED_HOSTS = ['*', ]"}
+    - {regexp: '^SESSION_ENGINE =', line: "SESSION_ENGINE = 'django.contrib.sessions.backends.cache'"}
+    - {regexp: '^OPENSTACK_KEYSTONE_URL =', line: "OPENSTACK_KEYSTONE_URL = 'http://%s:35357/v3' % OPENSTACK_HOST"}
+    - {regexp: '^OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT =', line: 'OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT = True'}
+    - {regexp: '^OPENSTACK_KEYSTONE_DEFAULT_DOMAIN =', line: "OPENSTACK_KEYSTONE_DEFAULT_DOMAIN = 'default'"}
+    - {regexp: '^OPENSTACK_KEYSTONE_DEFAULT_ROLE =', line: "OPENSTACK_KEYSTONE_DEFAULT_ROLE = 'member'"}
+    - {regexp: '^TIME_ZONE =', line: "TIME_ZONE = 'Asia/Shanghai'"}
+    - {regexp: '^USE_SSL =', line: "USE_SSL = True"}
+    - {regexp: '^CSRF_COOKIE_SECURE =', line: "CSRF_COOKIE_SECURE = True"}
+    - {regexp: '^SESSION_COOKIE_SECURE =', line: "SESSION_COOKIE_SECURE = True"}
+    - {regexp: '^SESSION_COOKIE_HTTPONLY =', line: "SESSION_COOKIE_HTTPONLY = True"}
+    - {regexp: '^SITE_BRANDING =', line: "SITE_BRANDING = 'Awcloud Dashboard'"}
+    - {regexp: '^WEBROOT =', line: "WEBROOT = '/'"}
+    - {regexp: '^OPENSTACK_ENDPOINT_TYPE =', line: "OPENSTACK_ENDPOINT_TYPE = 'internalURL'"}
+    - {regexp: '^SECONDARY_ENDPOINT_TYPE =', line: "SECONDARY_ENDPOINT_TYPE = 'adminURL'"}
+  notify: Restart Apache2
+
+- name: Remove default cache configuration
+  replace:
+    dest: '{{ openstack_horizon_dashboard_settings }}'
+    regexp: "CACHES = {\n    'default': {\n        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',\n    \
+      },\n}"
+    replace: ''
+  notify: Restart Apache2
+
+- name: Configuare memcached session storage service
+  blockinfile:
+    dest: '{{ openstack_horizon_dashboard_settings }}'
+    marker: '# {mark} Memcached session storage'
+    block: |
+      CACHES = {
+          'default': {
+              'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+              'LOCATION': '127.0.0.1:11211',
+          }
+      }
+  notify: Restart Apache2
+
+- name: Configure API version
+  blockinfile:
+    dest: '{{ openstack_horizon_dashboard_settings }}'
+    marker: '# {mark} Keystone API version'
+    block: |
+      OPENSTACK_API_VERSIONS = {
+          'identity': 3,
+          'image': 2,
+          'volume': 2,
+      }
+  notify: Restart Apache2
+  
+- name: WSGI Create the WSGI horizon configuration file
+  template:
+    src: 'openstack-dashboard.conf.jinja2'
+    dest: '{{ openstack_keystone_webserver_new_conf_dir_path }}/openstack-dashboard.conf'
+  notify:
+    - Restart Apache2
+
+- name: Remove apache 443 Listen
+  shell: "sed -i 's/^Listen 443 https/#Listen 443 https/g' /etc/httpd/conf.d/ssl.conf"
+  ignore_errors: true
+  notify:
+    - Restart Apache2

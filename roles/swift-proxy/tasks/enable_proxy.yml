@@ -1,0 +1,7 @@
+- name: Enable swift proxy
+  systemd:
+    name: openstack-swift-proxy
+    state: restarted
+    enabled: yes
+  tags:
+  - proxy

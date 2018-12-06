@@ -1,0 +1,27 @@
+---
+- name: User | Create User Group
+  group:
+    name: "{{user.group|default(user.name)}}"
+    system: "{{user.system|default(omit)}}"
+
+- name: User | Create User
+  user:
+    comment: "{{user.comment|default(omit)}}"
+    createhome: "{{user.createhome|default(omit)}}"
+    group: "{{user.group|default(user.name)}}"
+    home: "{{user.home|default(omit)}}"
+    shell: "{{user.shell|default(omit)}}"
+    name: "{{user.name}}"
+    system: "{{user.system|default(omit)}}"
+    password: "{{ user.password|password_hash('sha512') }}"
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+  
+- name: Config /etc/sudoers
+  lineinfile: dest=/etc/sudoers state=present  line='{{item}}' validate='visudo -cf %s'
+  with_items:
+    - "{{ user.name }} ALL=(ALL) NOPASSWD: ALL"
+    - "Defaults: {{ user.name }}  !requiretty"
+  when:
+    - "{{ user.sudoer }}"

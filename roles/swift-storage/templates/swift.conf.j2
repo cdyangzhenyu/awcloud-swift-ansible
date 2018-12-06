@@ -1,0 +1,19 @@
+[swift-hash]
+swift_hash_path_suffix = awcloud
+swift_hash_path_prefix = awcloud
+
+[storage-policy:0]
+name = Policy-0
+default = yes
+policy_type = replication
+aliases = repli
+
+[storage-policy:1]
+name = ec104
+policy_type = erasure_coding
+ec_type = liberasurecode_rs_vand
+ec_num_data_fragments = {{ec_num_data_fragments}}
+ec_num_parity_fragments = {{ec_num_parity_fragments}}
+ec_object_segment_size = 1048576
+
+[swift-constraints]

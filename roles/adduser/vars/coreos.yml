@@ -1,0 +1,9 @@
+---
+addusers:
+  - name: swift
+    comment: "Swift user"
+    createhome: yes
+    home: "{{ swift_data_dir }}"
+    system: yes
+    shell: /bin/nologin
+    group: "{{ swift_group }}"

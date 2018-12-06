@@ -1,0 +1,8 @@
+- name: Install swift-bench python modules
+  run_once: true
+  pip:
+    name: "swift-bench"
+
+- name: Run swift bench test
+  run_once: true
+  shell: "swift-bench -V 3 -A http://{{admin_vip}}:{{ha_admin_keystone_port}}/v3 -U admin:{{openstack_keystone_admin_password}} -K admin"

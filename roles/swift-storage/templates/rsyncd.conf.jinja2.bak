@@ -1,0 +1,59 @@
+uid = swift
+gid = swift
+log file = /var/log/rsyncd.log
+pid file = /var/run/rsyncd.pid
+address = {{ rsync_ip }}
+
+{% for ring in swift_ring_config.account_container %}
+  {% for device in ring.device %}
+  {% if ring.r_ip == rsync_ip %}
+  {% set account_rep_port = account_rep_port_begin + loop.index %}
+
+[account{{ account_rep_port }}]
+path            = /srv/node
+read only       = false
+write only      = no
+list            = yes
+incoming chmod  = 0644
+outgoing chmod  = 0644
+max connections = 25
+lock file =     /var/lock/account{{ account_rep_port }}.lock
+  {% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% for ring in swift_ring_config.account_container %}
+  {% for device in ring.device %}
+  {% if ring.r_ip == rsync_ip %}
+  {% set container_rep_port = container_rep_port_begin + loop.index %}
+  
+[container{{ container_rep_port }}]
+path            = /srv/node
+read only       = false
+write only      = no
+list            = yes
+incoming chmod  = 0644
+outgoing chmod  = 0644
+max connections = 25
+lock file =     /var/lock/container{{ container_rep_port }}.lock
+  {% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% for ring in swift_ring_config.object %}
+  {% for device in ring.device %}
+  {% if ring.r_ip == rsync_ip %}
+  {% set object_rep_port = object_rep_port_begin + loop.index %}
+
+[object{{ object_rep_port }}]
+path            = /srv/node
+read only       = false
+write only      = no
+list            = yes
+incoming chmod  = 0644
+outgoing chmod  = 0644
+max connections = 25
+lock file =     /var/lock/object{{ object_rep_port }}.lock
+  {% endif %}
+  {% endfor %}
+{% endfor %}

@@ -1,0 +1,42 @@
+---
+swift_group: swift
+swift_data_dir: "/var/lib/swift"
+system_username: awcloud
+system_userpass: Awcloud!23
+system_userhome: /home/{{ system_username }}
+
+addusers:
+  swift:
+    name: swift
+    comment: "Swift user"
+    createhome: yes
+    home: "{{ swift_data_dir }}"
+    system: yes
+    shell: /bin/nologin
+    group: "{{ swift_group }}"
+  
+  system:
+    name: "{{ system_username }}"
+    comment: "system user"
+    createhome: yes
+    home: "/home/{{ system_username }}"
+    system: yes
+    group: "root"
+    password: "{{ system_userpass }}"
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+    sudoer: yes
+
+adduser:
+  name: "{{ user.name }}"
+  group: "{{ user.name|default(None) }}"
+  comment: "{{ user.comment|default(None) }}"
+  shell: "{{ user.shell|default(None) }}"
+  system: "{{ user.system|default(None) }}"
+  createhome: "{{ user.createhome|default(None) }}"
+  password: "{{ user.password|password_hash('sha512')|default(None) }}"
+  generate_ssh_key: "{{ user.generate_ssh_key|default(None) }}"
+  ssh_key_bits: "{{ user.ssh_key_bits|default(None) }}"
+  ssh_key_file: "{{ user.ssh_key_file|default(None) }}"
+

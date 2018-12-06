@@ -1,0 +1,24 @@
+---
+
+galaxy_info:
+  author: Davide Guerri
+  description:
+  company: Hewlett-Packard Development Company, L.P.
+
+  license: Apache
+
+  min_ansible_version: 2.1
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - trusty
+        - xenial
+    - name: EL
+      versions:
+        - 7
+
+  categories:
+    - cloud
+
+dependencies: []

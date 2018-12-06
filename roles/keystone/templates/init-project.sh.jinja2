@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+openstack project create --domain default --description "Service Project" service
+openstack user create --domain default --password {{ openstack_keystone_admin_password }} admin
+openstack role create admin
+openstack role add --project admin --user admin admin
+
+openstack project create --domain default --description "Demo Project" demo
+openstack user create --domain default --password {{ openstack_keystone_demo_password }} demo
+openstack role add --project demo --user demo member
+
+

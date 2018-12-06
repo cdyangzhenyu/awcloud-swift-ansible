@@ -1,0 +1,25 @@
+  # Swift Ring
+
+- name: Render swift-ring
+  template:
+    src: create-swift-ring.sh.jinja2
+    dest: /tmp/create-swift-ring.sh
+  tags:
+  - ring
+
+- name: Create swift-ring
+  ignore_errors: yes
+  run_once: true
+  shell: bash /tmp/create-swift-ring.sh
+  tags:
+  - ring
+
+- name: copy ring to swift etc dir
+  copy: src={{ring_path}}/{{item}} dest=/etc/swift/{{item}} owner=swift group=root mode=0644
+  with_items:
+    - account.ring.gz
+    - container.ring.gz
+    - object.ring.gz
+    - object-1.ring.gz
+
+

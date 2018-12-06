@@ -1,0 +1,178 @@
+system_userpass: Awcloud!23
+
+system_username: awcloud
+system_userhome: /home/{{ system_username }}
+pacemaker_password: hacluster
+
+admin_vip: 192.168.247.240
+external_vip: 192.168.0.240
+public_ip: 192.168.0.240
+
+haproxy_listen_port: 8888
+swift_http_scheme: https
+swift_https_port: 8443
+
+
+galera_cluster_interface: eth0
+
+## Directory where swift data stored
+swift_data_dir: /var/lib/swift
+
+## Directory where the binaries will be installed
+bin_dir: /usr/local/bin
+
+mysql_port: 3307
+ha_mysql_port: 3306
+keystone_port: 5001
+ha_keystone_port: 5000
+admin_keystone_port: 35358
+ha_admin_keystone_port: 35357
+swift_port: 8081
+ha_swift_port: 8080
+horizon_port: 81
+horizon_https_port: 1443
+ha_horizon_port: 80
+ha_horizon_https_port: 443
+
+firewall_additional_rules:
+  - "iptables -A INPUT -p tcp --dport 4444 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p tcp --dport 4567 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p udp --dport 4567 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p tcp --dport 4568 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p tcp --dport 3306 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p tcp --dport 3307 -j ACCEPT -m comment --comment 'galera need'"
+  - "iptables -A INPUT -p tcp --dport 8888 -j ACCEPT -m comment --comment 'haproxy listen port'"
+  - "iptables -A INPUT -p tcp --dport 2224 -j ACCEPT -m comment --comment 'pacemaker port'"
+  - "iptables -A INPUT -p tcp --dport 5000 -j ACCEPT -m comment --comment 'ha keystone port'"
+  - "iptables -A INPUT -p tcp --dport 5001 -j ACCEPT -m comment --comment 'keystone port'"
+  - "iptables -A INPUT -p tcp --dport 35357 -j ACCEPT -m comment --comment 'ha keystone port'"
+  - "iptables -A INPUT -p tcp --dport 35358 -j ACCEPT -m comment --comment 'keystone port'"
+  - "iptables -A INPUT -p tcp --dport 8081 -j ACCEPT -m comment --comment 'swift port'"
+  - "iptables -A INPUT -p tcp --dport 8080 -j ACCEPT -m comment --comment 'ha swift port'"
+  - "iptables -A INPUT -p tcp --dport 6200 -j ACCEPT -m comment --comment 'swift object port'"
+  - "iptables -A INPUT -p tcp --dport 6201 -j ACCEPT -m comment --comment 'swift container port'"
+  - "iptables -A INPUT -p tcp --dport 6202 -j ACCEPT -m comment --comment 'swift account port'"
+  - "iptables -A INPUT -p tcp --dport 81 -j ACCEPT -m comment --comment 'horizon internal port'"
+  - "iptables -A INPUT -p tcp --dport 1443 -j ACCEPT -m comment --comment 'horizon internal https port'"
+  - "iptables -A INPUT -p tcp --dport 8443 -j ACCEPT -m comment --comment 'swift https port'"
+  #- "iptables -A INPUT -p tcp -m multiport --dport 6000:6600 -j ACCEPT -m comment --comment 'swift storage port'"
+  - "iptables -A INPUT -p tcp --dport 873 -j ACCEPT -m comment --comment 'swift rsyncd port'"
+  - "iptables -A INPUT -p tcp --dport 11211 -j ACCEPT -m comment --comment 'memcached port'"
+
+haproxy: 
+  controller:
+    - name: node1
+      admin_ip: 192.168.247.234
+      internal_ip: 10.10.10.234
+    - name: node2
+      admin_ip: 192.168.247.235
+      internal_ip: 10.10.10.235
+    - name: node3
+      admin_ip: 192.168.247.236
+      internal_ip: 10.10.10.236
+
+MYSQL_KEYSTONE_USER: keystone
+MYSQL_KEYSTONE_PASS: keystone
+MYSQL_KEYSTONE_DB: keystone
+ADMIN_TOKEN: ADMIN
+
+openstack_keystone_port: "{{ keystone_port }}"
+openstack_keystone_admin_bind_host: "{{ ansible_host }}"
+openstack_keystone_admin_port: "{{ admin_keystone_port }}"
+openstack_keystone_admin_password: admin
+openstack_keystone_demo_password: demo
+openstack_keystone_swift_password: swift
+
+openstack_keystone_memcached_servers:
+  - "{{ haproxy.controller[0].admin_ip }}:11211"
+  - "{{ haproxy.controller[1].admin_ip }}:11211"
+  - "{{ haproxy.controller[2].admin_ip }}:11211"
+
+ec_num_data_fragments: 6
+ec_num_parity_fragments: 3
+ec_all_fragments: 9
+rep_vdev_power: 12
+ac_rep_vdev_power: 8
+rep_num: 3
+
+swift_ring_config:
+    account_container:
+      - region: 1
+        zone: 1
+        ip: 10.10.10.237
+        r_ip: 10.10.0.237
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+      - region: 1
+        zone: 2
+        ip: 10.10.10.238
+        r_ip: 10.10.0.238
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+      - region: 1
+        zone: 3
+        ip: 10.10.10.239
+        r_ip: 10.10.0.239
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+    object:
+      - region: 1
+        zone: 1
+        ip: 10.10.10.237
+        r_ip: 10.10.0.237
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+      - region: 1
+        zone: 2
+        ip: 10.10.10.238
+        r_ip: 10.10.0.238
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+      - region: 1
+        zone: 3
+        ip: 10.10.10.239
+        r_ip: 10.10.0.239
+        device:
+          - disk: vdb
+            weight: 100
+          - disk: vdc
+            weight: 100
+          - disk: vdd
+            weight: 100
+
+account_req_port_begin: 6000
+account_rep_port_begin: 6300
+container_req_port_begin: 6100
+container_rep_port_begin: 6400
+object_req_port_begin: 6200
+object_rep_port_begin: 6500
+
+swift_disk: ["vdb", "vdc", "vdd"]
+disk_format: xfs
+mount_opts: noatime,nodiratime,nobarrier,logbufs=8
+http_scheme: http

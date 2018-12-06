@@ -1,0 +1,28 @@
+---
+- name: Install MariaDB server packages
+  yum: name={{ item }} state=present
+  with_items:
+    - MariaDB-client
+    - MariaDB-server
+    - galera
+
+- name: Install MariaDB-backup packages
+  yum: name=MariaDB-backup state=present
+  when: "mariadb_release | version_compare('10.2', '>=')"
+
+#- name: Install percona-xtrabackup packages
+#  yum: name={{ item }} state=present
+#  with_items:
+#    - percona-xtrabackup
+#    - socat
+#  when: "mariadb_release | version_compare('10.2', '<')"
+
+#- name: Install percona-xtrabackup-24 packages
+#  yum: name={{ item }} state=present
+#  with_items:
+#    - percona-xtrabackup-24
+#    - socat
+#  when: "mariadb_release | version_compare('10.2', '>=')"
+
+- name: Install MySQL-python
+  yum: name=MySQL-python state=present

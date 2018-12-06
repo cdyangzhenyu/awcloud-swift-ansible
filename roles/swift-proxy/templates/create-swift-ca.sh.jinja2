@@ -1,0 +1,3 @@
+openssl genrsa -out swift.key {{certificates_key_size}}
+
+openssl req -x509 -new -nodes -key swift.key -days {{certificates_duration}} -out swift.crt -subj "/CN=swift-ca"

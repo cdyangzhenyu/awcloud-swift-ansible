@@ -1,0 +1,14 @@
+ec_num_data_fragments: 6
+ec_num_parity_fragments: 3
+
+rep_vdev_power: 12
+rep_num: 3
+
+account_req_port_begin: 6000
+account_rep_port_begin: 6300
+container_req_port_begin: 6100
+container_rep_port_begin: 6400
+object_req_port_begin: 6200
+object_rep_port_begin: 6500
+
+ring_path: /root/ring

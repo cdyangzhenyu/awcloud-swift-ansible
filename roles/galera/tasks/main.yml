@@ -1,0 +1,18 @@
+---
+
+- include: repos.yml
+
+- include: packages.yml
+
+- include: privs.yml
+
+- include: config.yml
+
+- name: judge is bootstrap
+  run_once: true
+  shell: ls bootstrap
+  ignore_errors: True
+  register: result
+
+- include: bootstrap.yml
+  when: result|failed
